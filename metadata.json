@@ -1,0 +1,19 @@
+{
+    "KPlugin": {
+        "Name": "Custom Maximized Geometry",
+        "Description": "Makes maximizing windows have a 1920x980 window size at 0,30 position for a Mac-like window appearance",
+        "Icon": "preferences-system-windows-effect-maximize",
+        "Authors": [
+            {
+                "Name": "edywxz"
+            }
+        ],
+        "Id": "custom-maximized-geometry",
+        "Version": "1.0.0",
+        "License": "GPLv3",
+        "EnabledByDefault": true
+    },
+    "X-Plasma-API": "javascript",
+    "X-Plasma-MainScript": "code/main.js",
+    "KPackageStructure": "KWin/Script"
+}
