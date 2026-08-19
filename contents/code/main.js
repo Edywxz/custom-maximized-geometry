@@ -89,17 +89,6 @@ function isExceedingThreshold(geo) {
     return false;
 }
 
-function isMaximizedOrFullScreenTarget(window) {
-    if (!window || !window.frameGeometry) return false;
-    if (isNativeMaximized(window)) return true;
-    var geo = window.frameGeometry;
-    // Window starts above top bar or ends below dock with near full monitor height/width
-    if (geo.y < TARGET_Y && geo.height >= 900) return true;
-    if (geo.y + geo.height > MAX_Y && geo.height >= 950) return true;
-    if (geo.width >= 1600 && geo.height >= 900) return true;
-    return false;
-}
-
 function applyTargetGeometry(window) {
     if (!window || !window.normalWindow) return;
 
@@ -124,7 +113,7 @@ function applyTargetGeometry(window) {
     for (var i = 0; i < delays.length; i++) {
         (function (d) {
             runDelayed(d, function () {
-                if (window && window.normalWindow) {
+                if (window && window.normalWindow && !window.interactiveMoveResize) {
                     window.frameGeometry = target;
                 }
             });
@@ -145,7 +134,7 @@ function maximizeWindow(window) {
         var currentGeo = cloneGeometry(window.frameGeometry);
         var targetGeo = { x: TARGET_X, y: TARGET_Y, width: TARGET_WIDTH, height: TARGET_HEIGHT };
 
-        // Save current floating geometry before maximizing
+        // Save current floating geometry before maximizing if not already target
         if (currentGeo && !isSameGeometry(currentGeo, targetGeo)) {
             savedGeometries[windowId] = currentGeo;
         } else if (!savedGeometries[windowId]) {
@@ -183,7 +172,7 @@ function restoreWindow(window) {
         var restoreGeo = savedGeometries[windowId] || { x: 160, y: 90, width: 1600, height: 900 };
         window.frameGeometry = restoreGeo;
         runDelayed(50, function () {
-            if (window && window.normalWindow) {
+            if (window && window.normalWindow && !window.interactiveMoveResize) {
                 window.frameGeometry = restoreGeo;
             }
         });
@@ -211,6 +200,29 @@ function handleMaximizeToggle(window) {
     }
 }
 
+function handleInteractiveMoveResizeStart(window) {
+    if (!window) return;
+    var windowId = getWindowId(window);
+    if (!windowId) return;
+
+    if (customMaximized[windowId]) {
+        print("[CustomMaximizedGeometry] User started moving/resizing custom-maximized window: " + window.caption + " -> Releasing custom maximize state");
+        customMaximized[windowId] = false;
+        busyWindows[windowId] = true;
+        try {
+            if (typeof window.setMaximize === 'function') {
+                window.setMaximize(false, false);
+            } else {
+                window.maximized = false;
+            }
+        } finally {
+            runDelayed(200, function () {
+                delete busyWindows[windowId];
+            });
+        }
+    }
+}
+
 function enforceInitialWindowBounds(window) {
     if (!window || !window.normalWindow) return;
     if (window.skipTaskbar || window.dock || window.desktopWindow) return;
@@ -220,8 +232,8 @@ function enforceInitialWindowBounds(window) {
 
     if (customMaximized[windowId]) return;
 
-    if (isMaximizedOrFullScreenTarget(window)) {
-        print("[CustomMaximizedGeometry] Native maximized or full-screen target detected on creation: " + window.caption);
+    if (isNativeMaximized(window)) {
+        print("[CustomMaximizedGeometry] Native maximized window detected on creation: " + window.caption);
         maximizeWindow(window);
         return;
     }
@@ -244,6 +256,8 @@ function enforceInitialWindowBounds(window) {
 
 function enforceCustomMaximizedState(window) {
     if (!window || !window.normalWindow) return;
+    if (window.interactiveMoveResize) return;
+
     var windowId = getWindowId(window);
     if (!windowId || busyWindows[windowId]) return;
 
@@ -283,11 +297,25 @@ function registerWindow(window) {
     for (var i = 0; i < delays.length; i++) {
         (function (d) {
             runDelayed(d, function () {
-                if (window && window.normalWindow && !customMaximized[windowId]) {
+                if (window && window.normalWindow && !customMaximized[windowId] && !window.interactiveMoveResize) {
                     enforceInitialWindowBounds(window);
                 }
             });
         })(delays[i]);
+    }
+
+    if (window.interactiveMoveResizeStarted) {
+        window.interactiveMoveResizeStarted.connect(function () {
+            handleInteractiveMoveResizeStart(window);
+        });
+    }
+
+    if (window.moveResizedChanged) {
+        window.moveResizedChanged.connect(function () {
+            if (window.interactiveMoveResize) {
+                handleInteractiveMoveResizeStart(window);
+            }
+        });
     }
 
     if (window.maximizedAboutToChange) {
@@ -310,9 +338,16 @@ function registerWindow(window) {
 
     if (window.frameGeometryChanged) {
         window.frameGeometryChanged.connect(function () {
+            if (window.interactiveMoveResize) {
+                if (customMaximized[windowId]) {
+                    handleInteractiveMoveResizeStart(window);
+                }
+                return;
+            }
+
             if (!busyWindows[windowId] && customMaximized[windowId]) {
                 runDelayed(50, function () {
-                    if (!busyWindows[windowId] && customMaximized[windowId]) {
+                    if (!busyWindows[windowId] && customMaximized[windowId] && !window.interactiveMoveResize) {
                         enforceCustomMaximizedState(window);
                     }
                 });
@@ -333,7 +368,7 @@ workspace.windowAdded.connect(registerWindow);
 
 if (workspace.windowActivated) {
     workspace.windowActivated.connect(function (window) {
-        if (window) {
+        if (window && !window.interactiveMoveResize) {
             enforceCustomMaximizedState(window);
         }
     });
@@ -358,4 +393,4 @@ for (var i = 0; i < existingWindows.length; i++) {
     registerWindow(existingWindows[i]);
 }
 
-print("[CustomMaximizedGeometry] Script active: threshold enforced on creation & maximize/unmaximize; manual window movement unconstrained");
+print("[CustomMaximizedGeometry] Script active: threshold enforced on creation & maximize/unmaximize; manual window movement unconstrained & seamless dragging enabled");
