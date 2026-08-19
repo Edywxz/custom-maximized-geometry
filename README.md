@@ -15,7 +15,7 @@ Copy or symlink this directory to `~/.local/share/kwin/scripts/custom-maximized-
 
 ```bash
 mkdir -p ~/.local/share/kwin/scripts/
-git clone https://github.com/<username>/custom-maximized-geometry.git ~/.local/share/kwin/scripts/custom-maximized-geometry
+git clone https://github.com/Edywxz/custom-maximized-geometry.git ~/.local/share/kwin/scripts/custom-maximized-geometry
 ```
 
 Enable the script in **System Settings > Window Management > KWin Scripts** or via CLI:
