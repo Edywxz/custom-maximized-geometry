@@ -1,0 +1,188 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>Config</class>
+ <widget class="QWidget" name="Config">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>540</width>
+    <height>420</height>
+   </rect>
+  </property>
+  <layout class="QVBoxLayout" name="verticalLayout">
+   <item>
+    <widget class="QGroupBox" name="filterGroup">
+     <property name="title">
+      <string>Window Filtering Rules</string>
+     </property>
+     <layout class="QFormLayout" name="formLayoutFilters">
+      <item row="0" column="0">
+       <widget class="QLabel" name="labelBlacklist">
+        <property name="text">
+         <string>Blacklist:</string>
+        </property>
+        <property name="toolTip">
+         <string>Comma-separated list of window classes, app names, desktop IDs, or title substrings to ignore.</string>
+        </property>
+       </widget>
+      </item>
+      <item row="0" column="1">
+       <widget class="QLineEdit" name="kcfg_Blacklist">
+        <property name="toolTip">
+         <string>Matching windows will NOT have custom geometry or initial bounds enforced (e.g. spectacle, org.kde.spectacle).</string>
+        </property>
+        <property name="placeholderText">
+         <string>org.kde.spectacle, spectacle, Spectacle</string>
+        </property>
+       </widget>
+      </item>
+      <item row="1" column="0">
+       <widget class="QLabel" name="labelWhitelist">
+        <property name="text">
+         <string>Whitelist:</string>
+        </property>
+        <property name="toolTip">
+         <string>Comma-separated list of window classes or titles. If set, ONLY matching windows are affected.</string>
+        </property>
+       </widget>
+      </item>
+      <item row="1" column="1">
+       <widget class="QLineEdit" name="kcfg_Whitelist">
+        <property name="toolTip">
+         <string>Leave empty to process all non-blacklisted windows.</string>
+        </property>
+        <property name="placeholderText">
+         <string>Leave empty to process all non-blacklisted windows</string>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </widget>
+   </item>
+   <item>
+    <widget class="QGroupBox" name="geometryGroup">
+     <property name="title">
+      <string>Target Maximized Geometry</string>
+     </property>
+     <layout class="QGridLayout" name="gridLayoutGeometry">
+      <item row="0" column="0">
+       <widget class="QLabel" name="labelX">
+        <property name="text">
+         <string>X Position (px):</string>
+        </property>
+       </widget>
+      </item>
+      <item row="0" column="1">
+       <widget class="QSpinBox" name="kcfg_TargetX">
+        <property name="minimum">
+         <number>0</number>
+        </property>
+        <property name="maximum">
+         <number>10000</number>
+        </property>
+        <property name="value">
+         <number>0</number>
+        </property>
+       </widget>
+      </item>
+      <item row="0" column="2">
+       <widget class="QLabel" name="labelY">
+        <property name="text">
+         <string>Y Position (px):</string>
+        </property>
+       </widget>
+      </item>
+      <item row="0" column="3">
+       <widget class="QSpinBox" name="kcfg_TargetY">
+        <property name="minimum">
+         <number>0</number>
+        </property>
+        <property name="maximum">
+         <number>10000</number>
+        </property>
+        <property name="value">
+         <number>30</number>
+        </property>
+       </widget>
+      </item>
+      <item row="1" column="0">
+       <widget class="QLabel" name="labelWidth">
+        <property name="text">
+         <string>Width (px):</string>
+        </property>
+       </widget>
+      </item>
+      <item row="1" column="1">
+       <widget class="QSpinBox" name="kcfg_TargetWidth">
+        <property name="minimum">
+         <number>100</number>
+        </property>
+        <property name="maximum">
+         <number>10000</number>
+        </property>
+        <property name="value">
+         <number>1920</number>
+        </property>
+       </widget>
+      </item>
+      <item row="1" column="2">
+       <widget class="QLabel" name="labelHeight">
+        <property name="text">
+         <string>Height (px):</string>
+        </property>
+       </widget>
+      </item>
+      <item row="1" column="3">
+       <widget class="QSpinBox" name="kcfg_TargetHeight">
+        <property name="minimum">
+         <number>100</number>
+        </property>
+        <property name="maximum">
+         <number>10000</number>
+        </property>
+        <property name="value">
+         <number>980</number>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </widget>
+   </item>
+   <item>
+    <widget class="QGroupBox" name="behaviorGroup">
+     <property name="title">
+      <string>Behavior</string>
+     </property>
+     <layout class="QVBoxLayout" name="verticalLayoutBehavior">
+      <item>
+       <widget class="QCheckBox" name="kcfg_EnforceInitialBounds">
+        <property name="text">
+         <string>Clamp initial window dimensions within target threshold on creation</string>
+        </property>
+        <property name="checked">
+         <bool>true</bool>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </widget>
+   </item>
+   <item>
+    <spacer name="verticalSpacer">
+     <property name="orientation">
+      <enum>Qt::Vertical</enum>
+     </property>
+     <property name="sizeHint" stdset="0">
+      <size>
+       <width>20</width>
+       <height>40</height>
+      </size>
+     </property>
+    </spacer>
+   </item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>

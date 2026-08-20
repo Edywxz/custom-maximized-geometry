@@ -11,9 +11,11 @@
         "Id": "custom-maximized-geometry",
         "Version": "1.0.0",
         "License": "GPLv3",
-        "EnabledByDefault": true
+        "EnabledByDefault": true,
+        "KCM": "kwin/effects/configs/kcm_kwin4_genericscripted"
     },
     "X-Plasma-API": "javascript",
+    "X-KDE-ConfigModule": "kwin/effects/configs/kcm_kwin4_genericscripted",
     "X-Plasma-MainScript": "code/main.js",
     "KPackageStructure": "KWin/Script"
 }

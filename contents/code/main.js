@@ -1,20 +1,101 @@
 /*
  * Custom Maximized Geometry - KWin Script for KDE Plasma 6
- * Target geometry: x = 0, y = 30, width = 1920, height = 980
- * Threshold bounds: X [0..1920], Y [30..1010]
+ * Target geometry: configurable (default: x = 0, y = 30, width = 1920, height = 980)
+ * Filtering: configurable whitelist and blacklist (default blacklist includes Spectacle)
  */
-
-var TARGET_X = 0;
-var TARGET_Y = 30;
-var TARGET_WIDTH = 1920;
-var TARGET_HEIGHT = 980;
-
-var MAX_X = TARGET_X + TARGET_WIDTH;   // 1920
-var MAX_Y = TARGET_Y + TARGET_HEIGHT;  // 1010
 
 var savedGeometries = {};
 var customMaximized = {};
 var busyWindows = {};
+
+function getConfig(key, defaultValue) {
+    if (typeof readConfig === "function") {
+        try {
+            var val = readConfig(key, defaultValue);
+            if (val !== undefined && val !== null) {
+                return val;
+            }
+        } catch (e) {
+            print("[CustomMaximizedGeometry] Error reading config '" + key + "': " + e);
+        }
+    }
+    return defaultValue;
+}
+
+function getTargetGeometry() {
+    var x = Number(getConfig("TargetX", 0));
+    var y = Number(getConfig("TargetY", 30));
+    var w = Number(getConfig("TargetWidth", 1920));
+    var h = Number(getConfig("TargetHeight", 980));
+    return {
+        x: isNaN(x) ? 0 : x,
+        y: isNaN(y) ? 30 : y,
+        width: isNaN(w) || w <= 0 ? 1920 : w,
+        height: isNaN(h) || h <= 0 ? 980 : h
+    };
+}
+
+function getThresholdBounds() {
+    var target = getTargetGeometry();
+    return {
+        target: target,
+        maxX: target.x + target.width,
+        maxY: target.y + target.height
+    };
+}
+
+function getWindowIdentifiers(window) {
+    if (!window) return [];
+    var list = [];
+    if (window.resourceClass) list.push(window.resourceClass.toString().toLowerCase());
+    if (window.resourceName) list.push(window.resourceName.toString().toLowerCase());
+    if (window.desktopFileName) list.push(window.desktopFileName.toString().toLowerCase());
+    if (window.caption) list.push(window.caption.toString().toLowerCase());
+    return list;
+}
+
+function parseList(str) {
+    if (!str || typeof str !== 'string') return [];
+    return str.split(',')
+        .map(function (item) { return item.trim().toLowerCase(); })
+        .filter(function (item) { return item.length > 0; });
+}
+
+function matchesFilter(window, filterList) {
+    if (!window || !filterList || filterList.length === 0) return false;
+    var ids = getWindowIdentifiers(window);
+    for (var i = 0; i < filterList.length; i++) {
+        var pattern = filterList[i];
+        for (var j = 0; j < ids.length; j++) {
+            var id = ids[j];
+            if (id === pattern || id.indexOf(pattern) !== -1) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+function isWindowAllowed(window) {
+    if (!window || !window.normalWindow) return false;
+    if (window.skipTaskbar || window.dock || window.desktopWindow) return false;
+
+    var rawBlacklist = getConfig("Blacklist", "org.kde.spectacle, spectacle, Spectacle");
+    var blacklist = parseList(rawBlacklist);
+    if (blacklist.length > 0 && matchesFilter(window, blacklist)) {
+        return false;
+    }
+
+    var rawWhitelist = getConfig("Whitelist", "");
+    var whitelist = parseList(rawWhitelist);
+    if (whitelist.length > 0) {
+        if (!matchesFilter(window, whitelist)) {
+            return false;
+        }
+    }
+
+    return true;
+}
 
 function runDelayed(ms, callback) {
     var timer = new QTimer();
@@ -66,10 +147,12 @@ function isNativeMaximized(window) {
 
 function constrainGeometryToThreshold(geo) {
     if (!geo) return null;
-    var w = Math.min(geo.width, TARGET_WIDTH);
-    var h = Math.min(geo.height, TARGET_HEIGHT);
-    var x = Math.max(TARGET_X, Math.min(geo.x, MAX_X - w));
-    var y = Math.max(TARGET_Y, Math.min(geo.y, MAX_Y - h));
+    var bounds = getThresholdBounds();
+    var target = bounds.target;
+    var w = Math.min(geo.width, target.width);
+    var h = Math.min(geo.height, target.height);
+    var x = Math.max(target.x, Math.min(geo.x, bounds.maxX - w));
+    var y = Math.max(target.y, Math.min(geo.y, bounds.maxY - h));
     return {
         x: x,
         y: y,
@@ -80,24 +163,21 @@ function constrainGeometryToThreshold(geo) {
 
 function isExceedingThreshold(geo) {
     if (!geo) return false;
-    if (geo.y < TARGET_Y) return true;
-    if (geo.y + geo.height > MAX_Y) return true;
-    if (geo.x < TARGET_X) return true;
-    if (geo.x + geo.width > MAX_X) return true;
-    if (geo.height > TARGET_HEIGHT) return true;
-    if (geo.width > TARGET_WIDTH) return true;
+    var bounds = getThresholdBounds();
+    var target = bounds.target;
+    if (geo.y < target.y) return true;
+    if (geo.y + geo.height > bounds.maxY) return true;
+    if (geo.x < target.x) return true;
+    if (geo.x + geo.width > bounds.maxX) return true;
+    if (geo.height > target.height) return true;
+    if (geo.width > target.width) return true;
     return false;
 }
 
 function applyTargetGeometry(window) {
     if (!window || !window.normalWindow) return;
 
-    var target = {
-        x: TARGET_X,
-        y: TARGET_Y,
-        width: TARGET_WIDTH,
-        height: TARGET_HEIGHT
-    };
+    var target = getTargetGeometry();
 
     // Unmaximize natively so KWin compositor doesn't lock geometry to full screen
     if (typeof window.setMaximize === 'function') {
@@ -122,8 +202,7 @@ function applyTargetGeometry(window) {
 }
 
 function maximizeWindow(window) {
-    if (!window || !window.normalWindow) return;
-    if (window.skipTaskbar || window.dock || window.desktopWindow) return;
+    if (!isWindowAllowed(window)) return;
 
     var windowId = getWindowId(window);
     if (!windowId || busyWindows[windowId]) return;
@@ -132,7 +211,7 @@ function maximizeWindow(window) {
 
     try {
         var currentGeo = cloneGeometry(window.frameGeometry);
-        var targetGeo = { x: TARGET_X, y: TARGET_Y, width: TARGET_WIDTH, height: TARGET_HEIGHT };
+        var targetGeo = getTargetGeometry();
 
         // Save current floating geometry before maximizing if not already target
         if (currentGeo && !isSameGeometry(currentGeo, targetGeo)) {
@@ -187,8 +266,7 @@ function restoreWindow(window) {
 }
 
 function handleMaximizeToggle(window) {
-    if (!window || !window.normalWindow) return;
-    if (window.skipTaskbar || window.dock || window.desktopWindow) return;
+    if (!isWindowAllowed(window)) return;
 
     var windowId = getWindowId(window);
     if (!windowId) return;
@@ -224,8 +302,10 @@ function handleInteractiveMoveResizeStart(window) {
 }
 
 function enforceInitialWindowBounds(window) {
-    if (!window || !window.normalWindow) return;
-    if (window.skipTaskbar || window.dock || window.desktopWindow) return;
+    if (!isWindowAllowed(window)) return;
+
+    var enforceInitial = Boolean(getConfig("EnforceInitialBounds", true));
+    if (!enforceInitial) return;
 
     var windowId = getWindowId(window);
     if (!windowId || busyWindows[windowId]) return;
@@ -241,7 +321,7 @@ function enforceInitialWindowBounds(window) {
     if (isExceedingThreshold(window.frameGeometry)) {
         var constrained = constrainGeometryToThreshold(window.frameGeometry);
         if (constrained && !isSameGeometry(window.frameGeometry, constrained)) {
-            print("[CustomMaximizedGeometry] Clamping initial window geometry within 1920x980 threshold for: " + window.caption);
+            print("[CustomMaximizedGeometry] Clamping initial window geometry within target threshold for: " + window.caption);
             busyWindows[windowId] = true;
             try {
                 window.frameGeometry = constrained;
@@ -255,14 +335,14 @@ function enforceInitialWindowBounds(window) {
 }
 
 function enforceCustomMaximizedState(window) {
-    if (!window || !window.normalWindow) return;
+    if (!isWindowAllowed(window)) return;
     if (window.interactiveMoveResize) return;
 
     var windowId = getWindowId(window);
     if (!windowId || busyWindows[windowId]) return;
 
     if (customMaximized[windowId]) {
-        var target = { x: TARGET_X, y: TARGET_Y, width: TARGET_WIDTH, height: TARGET_HEIGHT };
+        var target = getTargetGeometry();
         if (!isSameGeometry(window.frameGeometry, target) || isNativeMaximized(window)) {
             print("[CustomMaximizedGeometry] Enforcing target geometry for custom-maximized window: " + window.caption);
             applyTargetGeometry(window);
@@ -277,14 +357,14 @@ function enforceAllCustomMaximizedWindows() {
         var win = windows[i];
         if (!win || !win.normalWindow) continue;
         if (win.skipTaskbar || win.dock || win.desktopWindow) continue;
+        if (!isWindowAllowed(win)) continue;
 
         enforceCustomMaximizedState(win);
     }
 }
 
 function registerWindow(window) {
-    if (!window || !window.normalWindow) return;
-    if (window.skipTaskbar || window.dock || window.desktopWindow) return;
+    if (!isWindowAllowed(window)) return;
 
     var windowId = getWindowId(window);
     if (!windowId) return;
@@ -297,7 +377,7 @@ function registerWindow(window) {
     for (var i = 0; i < delays.length; i++) {
         (function (d) {
             runDelayed(d, function () {
-                if (window && window.normalWindow && !customMaximized[windowId] && !window.interactiveMoveResize) {
+                if (window && window.normalWindow && isWindowAllowed(window) && !customMaximized[windowId] && !window.interactiveMoveResize) {
                     enforceInitialWindowBounds(window);
                 }
             });
@@ -328,6 +408,7 @@ function registerWindow(window) {
 
     if (window.maximizedChanged) {
         window.maximizedChanged.connect(function () {
+            if (!isWindowAllowed(window)) return;
             if (isNativeMaximized(window) && !customMaximized[windowId]) {
                 maximizeWindow(window);
             } else if (!isNativeMaximized(window) && customMaximized[windowId]) {
@@ -368,7 +449,7 @@ workspace.windowAdded.connect(registerWindow);
 
 if (workspace.windowActivated) {
     workspace.windowActivated.connect(function (window) {
-        if (window && !window.interactiveMoveResize) {
+        if (window && !window.interactiveMoveResize && isWindowAllowed(window)) {
             enforceCustomMaximizedState(window);
         }
     });
@@ -393,4 +474,4 @@ for (var i = 0; i < existingWindows.length; i++) {
     registerWindow(existingWindows[i]);
 }
 
-print("[CustomMaximizedGeometry] Script active: threshold enforced on creation & maximize/unmaximize; manual window movement unconstrained & seamless dragging enabled");
+print("[CustomMaximizedGeometry] Script active with blacklist/whitelist configuration support");
